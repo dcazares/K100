@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Log Your Kindness — Kindness 100 Project</title>
+<meta name="description" content="Receive a token, do a kindness, log it, pass it on.">
+<style>
+  :root { --teal:#0F766E; --char:#111827; --muted:#6B7280; --bg:#ffffff; }
+  * { box-sizing: border-box; }
+  body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:0; background:var(--bg); color:var(--char); }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 24px; }
+  h1 { color: var(--teal); font-weight: 800; margin: 8px 0 4px; }
+  p.lead { margin-top: 0; color: var(--muted); }
+  label { display:block; margin: 14px 0 6px; font-weight: 600; }
+  input, textarea { width:100%; padding:12px; border:1px solid #e5e7eb; border-radius:12px; font-size:16px; }
+  textarea { min-height: 140px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .check { display:flex; gap:10px; align-items:flex-start; margin-top:10px; }
+  .btn { margin-top:16px; background:var(--teal); color:#fff; border:0; border-radius:12px; padding:14px 16px; font-weight:700; width:100%; }
+  .muted { color:var(--muted); font-size:14px; }
+  .ok { background:#ecfdf5; color:#065f46; padding:12px; border-radius:12px; margin-top:14px; display:none; }
+  .err{ background:#fef2f2; color:#991b1b; padding:12px; border-radius:12px; margin-top:14px; display:none; }
+  .share { display:none; margin-top:14px; padding:12px; border:1px dashed #94a3b8; border-radius:12px; }
+  .share textarea { min-height:72px; font-size:14px; }
+  .actions { display:flex; gap:10px; margin-top:10px; }
+  .sec { background:#f3f4f6; border-radius:12px; padding:12px; margin-top:16px; }
+  .hp { position:absolute; left:-5000px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Log Your Kindness</h1>
+  <p class="lead">It takes ~30 seconds. You can post anonymously. 🦉 Pass it on after you log.</p>
+
+  <form id="f" autocomplete="on">
+    <label for="token">Token ID</label>
+    <input id="token" name="token_id" placeholder="K100-001" required />
+
+    <label for="story">What happened?</label>
+    <textarea id="story" name="story" placeholder="A few sentences about the kindness you did or received…" required></textarea>
+
+    <div class="check">
+      <input id="consent" name="consent_public" type="checkbox" />
+      <label for="consent" style="margin:0">
+        I consent to share this story (anonymously). We’ll publish just the story and general location.
+      </label>
+    </div>
+
+    <!-- Optional, hidden via URL params -->
+    <input class="hp" name="honey" autocomplete="off" placeholder="Leave blank" />
+
+    <button class="btn" type="submit">Submit</button>
+    <div id="ok" class="ok">Thanks! Your kindness is logged. Pass your token along 💙</div>
+    <div id="err" class="err">Sorry, something went wrong. Please try again.</div>
+  </form>
+
+  <div id="shareBox" class="share">
+    <div class="sec">
+      <strong>Want to spread the ripple?</strong>
+      <p class="muted" style="margin:6px 0 8px">Post this on your socials (or tweak it):</p>
+      <textarea id="shareText"></textarea>
+      <div class="actions">
+        <button id="copyBtn" class="btn" style="width:auto;padding:10px 14px">Copy text</button>
+        <button id="shareBtn" class="btn" style="width:auto;padding:10px 14px">Share…</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="muted" style="margin-top:18px">
+    We capture approximate location (city/country) from your IP to map the kindness ripple.
+    We don’t publish precise coordinates. Remove your entry anytime: hello@kindness100project.com.
+  </p>
+</div>
+
+<script>
+  // --- Prefill token & campaign meta from QR URL ---
+  const q = new URLSearchParams(location.search);
+  const token = (q.get('token_id') || q.get('token') || '').toUpperCase();
+  if (token) document.getElementById('token').value = token;
+
+  // Keep channel/batch from the QR or fall back
+  const channel = q.get('channel') || 'card';
+  const batch   = q.get('batch')   || '';
+
+  // UTMs if present
+  const utm = {
+    utm_source:  q.get('utm_source')  || '',
+    utm_medium:  q.get('utm_medium')  || '',
+    utm_campaign:q.get('utm_campaign')|| '',
+    utm_content: q.get('utm_content') || '',
+    utm_term:    q.get('utm_term')    || ''
+  };
+
+  // Client timezone for context
+  const tzClient = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+
+  // --- Submit handler ---
+  const form = document.getElementById('f');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(form).entries());
+
+    // Normalize consent to "true"/"false" string for Worker
+    data.consent_public = document.getElementById('consent').checked ? 'true' : 'false';
+
+    // Merge meta
+    const body = { ...data, channel, batch, ...utm, timezone_client: tzClient };
+
+    try {
+      const res = await fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify(body),
+        cache: 'no-store',
+        credentials: 'omit'
+      });
+      const json = await res.json();
+      if (json.ok) {
+        document.getElementById('ok').style.display = 'block';
+        document.getElementById('err').style.display = 'none';
+        showSharePrompt();
+        form.reset();
+      } else {
+        document.getElementById('ok').style.display = 'none';
+        document.getElementById('err').style.display = 'block';
+      }
+    } catch {
+      document.getElementById('ok').style.display = 'none';
+      document.getElementById('err').style.display = 'block';
+    }
+  });
+
+  // --- Post-submit share CTA ---
+  function showSharePrompt() {
+    const el = document.getElementById('shareBox');
+    const t = document.getElementById('token').value || token || 'a Kindness Token';
+    const shareText =
+`I just logged a kindness act 🦉 #Kindness100
+Token: ${t}
+Join the ripple → log.kindness100project.com`;
+
+    document.getElementById('shareText').value = shareText;
+    el.style.display = 'block';
+
+    document.getElementById('copyBtn').onclick = async () => {
+      await navigator.clipboard.writeText(shareText);
+      alert('Copied! Paste on your socials 💙');
+    };
+    document.getElementById('shareBtn').onclick = async () => {
+      if (navigator.share) {
+        try { await navigator.share({ text: shareText }); } catch {}
+      } else {
+        await navigator.clipboard.writeText(shareText);
+        alert('Copied! Paste on your socials 💙');
+      }
+    };
+  }
+</script>
+</body>
+</html>
