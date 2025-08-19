@@ -15,7 +15,9 @@
   label { display:block; margin: 14px 0 6px; font-weight: 600; }
   input, textarea { width:100%; padding:12px; border:1px solid #e5e7eb; border-radius:12px; font-size:16px; }
   textarea { min-height: 140px; }
+  .counter { font-size:12px; color:#6B7280; text-align:right; margin-top:6px; }
   .btn { margin-top:16px; background:var(--teal); color:#fff; border:0; border-radius:12px; padding:14px 16px; font-weight:700; width:100%; }
+  button[disabled]{ opacity:.6; cursor:not-allowed; }
   .muted { color:var(--muted); font-size:14px; }
   .ok { background:#ecfdf5; color:#065f46; padding:12px; border-radius:12px; margin-top:14px; display:none; }
   .err{ background:#fef2f2; color:#991b1b; padding:12px; border-radius:12px; margin-top:14px; display:none; }
@@ -23,9 +25,7 @@
   .share textarea { min-height:72px; font-size:14px; }
   .actions { display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; }
   .sec { background:#f3f4f6; border-radius:12px; padding:12px; margin-top:16px; }
-  .rowaux { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .hp { position:absolute; left:-5000px; }
-  .counter { font-size:12px; color:#6B7280; text-align:right; margin-top:6px; }
 </style>
 </head>
 <body>
@@ -41,29 +41,29 @@
     <textarea id="story" name="story" maxlength="600" placeholder="A few sentences about the kindness you did or received…" required></textarea>
     <div class="counter"><span id="count">0</span>/600</div>
 
-    <!-- Honeypot -->
+    <!-- Honeypot (anti-bot) -->
     <input class="hp" name="honey" autocomplete="off" placeholder="Leave blank" />
 
-    <button class="btn" type="submit">Submit</button>
-    <div id="ok" class="ok">Thanks! Your kindness is logged. Pass your token along 💙</div>
-    <div id="err" class="err">Sorry, something went wrong. Please try again.</div>
+    <button id="submitBtn" class="btn" type="submit">Submit</button>
+    <div id="ok" class="ok" role="status">Thanks! Your kindness is logged. Pass your token along 💙</div>
+    <div id="err" class="err" role="alert">Sorry, something went wrong. Please try again.</div>
   </form>
 
-  <div id="shareBox" class="share">
+  <div id="shareBox" class="share" aria-live="polite">
     <div class="sec">
       <strong>Want to spread the ripple?</strong>
       <p class="muted" style="margin:6px 0 8px">Post this on your socials (or tweak it):</p>
       <textarea id="shareText"></textarea>
       <div class="actions">
-        <button id="copyBtn" class="btn" style="width:auto;padding:10px 14px">Copy text</button>
-        <button id="shareBtn" class="btn" style="width:auto;padding:10px 14px">Share…</button>
+        <button id="copyBtn" class="btn" type="button" style="width:auto;padding:10px 14px">Copy text</button>
+        <button id="shareBtn" class="btn" type="button" style="width:auto;padding:10px 14px">Share…</button>
       </div>
     </div>
   </div>
 
   <p class="muted" style="margin-top:18px">
-    We capture approximate location (city/country) from your IP to map the kindness ripple.
-    We don’t publish precise coordinates. Remove your entry anytime: hello@kindness100project.com.
+    We capture approximate location (city/country) to map the kindness ripple. We don’t publish precise coordinates.
+    Remove your entry anytime: hello@kindness100project.com.
   </p>
 </div>
 
@@ -77,10 +77,10 @@
 
   // --- Prefill token & campaign meta from QR URL ---
   const q = new URLSearchParams(location.search);
-  const token = (q.get('token_id') || q.get('token') || '').toUpperCase();
-  if (token) document.getElementById('token').value = token;
+  const tokenFromUrl = (q.get('token_id') || q.get('token') || '').toUpperCase();
+  if (tokenFromUrl) document.getElementById('token').value = tokenFromUrl;
 
-  // Keep channel/batch from the QR or fall back
+  // Keep channel/batch from QR (or defaults)
   const channel = q.get('channel') || 'card';
   const batch   = q.get('batch')   || '';
 
@@ -96,18 +96,36 @@
   // Client timezone for context
   const tzClient = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
 
-  // --- Submit handler ---
+  // --- Submit handler with loading/success states ---
   const form = document.getElementById('f');
+  const submitBtn = document.getElementById('submitBtn');
+  const okEl  = document.getElementById('ok');
+  const errEl = document.getElementById('err');
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const data = Object.fromEntries(new FormData(form).entries());
 
-    // Require minimal fields
-    if (!data.token_id || !document.getElementById('story').value.trim()) {
-      document.getElementById('err').style.display = 'block';
+    // prevent double-taps
+    if (submitBtn.disabled) return;
+
+    // basic validation
+    const tokenVal = document.getElementById('token').value.trim();
+    const storyVal = storyEl.value.trim();
+    if (!tokenVal || !storyVal) {
+      errEl.textContent = 'Please add a token and a short story.';
+      errEl.style.display = 'block';
+      okEl.style.display = 'none';
       return;
     }
 
+    // set loading state
+    const original = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending…';
+    okEl.style.display = 'none';
+    errEl.style.display = 'none';
+
+    const data = Object.fromEntries(new FormData(form).entries());
     const body = { ...data, channel, batch, ...utm, timezone_client: tzClient };
 
     try {
@@ -118,20 +136,25 @@
         cache: 'no-store',
         credentials: 'omit'
       });
-      const json = await res.json();
-      if (json.ok) {
-        document.getElementById('ok').style.display = 'block';
-        document.getElementById('err').style.display = 'none';
+
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.ok) {
+        submitBtn.textContent = '✅ Logged!';
+        okEl.style.display = 'block';
+        errEl.style.display = 'none';
         showSharePrompt();
         form.reset();
         updateCount();
+        setTimeout(() => { submitBtn.textContent = original; submitBtn.disabled = false; }, 1200);
       } else {
-        document.getElementById('ok').style.display = 'none';
-        document.getElementById('err').style.display = 'block';
+        throw new Error(json.upstream_error || json.error || 'Request failed');
       }
-    } catch {
-      document.getElementById('ok').style.display = 'none';
-      document.getElementById('err').style.display = 'block';
+    } catch (e2) {
+      errEl.textContent = 'Sorry, something went wrong. Please try again.';
+      errEl.style.display = 'block';
+      okEl.style.display = 'none';
+      submitBtn.textContent = 'Try again';
+      submitBtn.disabled = false;
     }
   });
 
@@ -139,7 +162,8 @@
   function showSharePrompt() {
     const el = document.getElementById('shareBox');
     const shareText =
-`I just logged a kindness act 🦉 #Kindness100Whisper`;
+`I just logged a kindness act 🦉 #Kindness100
+Join the ripple → log.kindness100project.com`;
     document.getElementById('shareText').value = shareText;
     el.style.display = 'block';
 
