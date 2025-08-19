@@ -31,14 +31,14 @@
 <body>
 <div class="wrap">
   <h1>Log Your Kindness</h1>
-  <p class="lead">It takes ~30 seconds. Anonymous is OK. 🦉 Pass it on after you log.</p>
+  <p class="lead"> Every act of kindness counts. Share yours here and help Whisper the Owl reach 100! It takes ~30 seconds. Anonymous is OK. 🦉 After you log, pass on the card by doing an act of kindness (Whisper loves anonymously paying for someone's food at a restaurant).</p>
 
   <form id="f" autocomplete="on" novalidate>
     <label for="token">Token ID</label>
     <input id="token" name="token_id" placeholder="K100-001" required inputmode="latin-prose" />
 
     <label for="story">What happened?</label>
-    <textarea id="story" name="story" maxlength="600" placeholder="A few sentences about the kindness you did or received…" required></textarea>
+    <textarea id="story" name="story" maxlength="600" placeholder="A few sentences about the kindness you received…" required></textarea>
     <div class="counter"><span id="count">0</span>/600</div>
 
     <!-- Honeypot (anti-bot) -->
@@ -51,8 +51,8 @@
 
   <div id="shareBox" class="share" aria-live="polite">
     <div class="sec">
-      <strong>Want to spread the ripple?</strong>
-      <p class="muted" style="margin:6px 0 8px">Post this on your socials (or tweak it):</p>
+      <strong>Want to spread the message?</strong>
+      <p class="muted" style="margin:6px 0 8px">Post this on your socials:</p>
       <textarea id="shareText"></textarea>
       <div class="actions">
         <button id="copyBtn" class="btn" type="button" style="width:auto;padding:10px 14px">Copy text</button>
@@ -145,7 +145,7 @@
         showSharePrompt();
         form.reset();
         updateCount();
-        setTimeout(() => { submitBtn.textContent = original; submitBtn.disabled = false; }, 1200);
+        setTimeout(() => { submitBtn.textContent = original; submitBtn.disabled = false; }, 12000);
       } else {
         throw new Error(json.upstream_error || json.error || 'Request failed');
       }
@@ -162,8 +162,7 @@
   function showSharePrompt() {
     const el = document.getElementById('shareBox');
     const shareText =
-`I just logged a kindness act 🦉 #Kindness100
-Join the ripple → log.kindness100project.com`;
+`I just logged a kindness act 🦉 #Kindness100Whisper`;
     document.getElementById('shareText').value = shareText;
     el.style.display = 'block';
 
