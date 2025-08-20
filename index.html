@@ -62,7 +62,7 @@
   </div>
 
   <p class="muted" style="margin-top:18px">
-    We capture approximate location (city/country) to map the kindness ripple. We don’t publish precise coordinates.
+    We capture approximate location (city/country) to map the Whisper kindness ripple. 
     Remove your entry anytime: hello@kindness100project.com.
   </p>
 </div>
@@ -145,7 +145,7 @@
         showSharePrompt();
         form.reset();
         updateCount();
-        setTimeout(() => { submitBtn.textContent = original; submitBtn.disabled = false; }, 12000);
+        setTimeout(() => { submitBtn.textContent = original; submitBtn.disabled = false; }, 24000);
       } else {
         throw new Error(json.upstream_error || json.error || 'Request failed');
       }
@@ -162,7 +162,7 @@
   function showSharePrompt() {
     const el = document.getElementById('shareBox');
     const shareText =
-`I just logged a kindness act 🦉 #Kindness100Whisper`;
+`#Kindness100Project #Kindness100Whisper`;
     document.getElementById('shareText').value = shareText;
     el.style.display = 'block';
 
